@@ -44,6 +44,13 @@ spl_autoload_register('Modules::autoload');
  * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
+ *
+ * This is a forked version of the original Modular Extensions - HMVC library to
+ * support better module routing, and speed optimizations. These additional
+ * changes were made by:
+ * 
+ * @author		Brian Wozeniak
+ * @copyright	Copyright (c) 1998-2012, Unmelted, LLC
  **/
 class Modules
 {
@@ -141,7 +148,7 @@ class Modules
 		
 		if ($type === 'other') {			
 			if (class_exists($file, FALSE))	{
-				log_message('debug', "File already loaded: {$location}");				
+				log_message('debug', "**File already loaded: {$location}");				
 				return $result;
 			}	
 			include_once $location;
@@ -165,7 +172,7 @@ class Modules
 	* Also scans application directories for models, plugins and views.
 	* Generates fatal error if file not found.
 	**/
-	public static function find($file, $module, $base) {
+	public static function find($file, $module, $base, $location = false) {
 	
 		$segments = explode('/', $file);
 
@@ -173,20 +180,54 @@ class Modules
 		$file_ext = (pathinfo($file, PATHINFO_EXTENSION)) ? $file : $file.EXT;
 		
 		$path = ltrim(implode('/', $segments).'/', '/');	
-		$module ? $modules[$module] = $path : $modules = array();
+		$modules = array();
 		
+		// We want to execute the below first under the assumption that the $file contains
+		// the module as well in the segment, and if so is assumed to be most likely the
+		// correct location, and this limits how much searching we do as if found it
+		// immediately returns that result instead of searching through both
 		if ( ! empty($segments)) {
-			$modules[array_shift($segments)] = ltrim(implode('/', $segments).'/','/');
-		}	
+			$modules[array_shift($segments)] = ltrim(implode('/', $segments).'/','/');			
+		}
 
-		foreach (Modules::$locations as $location => $offset) {					
-			foreach($modules as $module => $subpath) {			
+		// If $module arg exists, then add as a place to search with $file as full path
+		// as it would then be assumed to have no module in that first arg then
+		if ($module && !isset($modules[$module])) {
+			$modules[$module] = $path;
+		}
+		//One last area to search if modules is still empty, use file as the module name
+		elseif(empty($modules)) {
+			$modules[$file] = $path;
+		}
+		
+		if($location) {
+			foreach($modules as $module => $subpath) {
 				$fullpath = $location.$module.'/'.$base.$subpath;
-				
-				if ($base == 'libraries/' AND is_file($fullpath.ucfirst($file_ext))) 
-					return array($fullpath, ucfirst($file));
 					
+				if ($base == 'libraries/' AND is_file($fullpath.ucfirst($file_ext)))
+					return array($fullpath, ucfirst($file));
+
+				//log_message('debug', "Checking to see if $fullpath$file_ext exists: ". ((is_file($fullpath.$file_ext)) ? '**yes**' : 'no' ));
 				if (is_file($fullpath.$file_ext)) return array($fullpath, $file);
+			}	
+		}
+		else {
+			//Go through loop if necessary
+			foreach($modules as $module => $subpath) {
+				$directories = CI::$APP->router->module_map($module);
+				
+				foreach($directories as $module => $locations) {
+					foreach($locations as $location) {
+						$fullpath = $location.$module.'/'.$base.$subpath;
+					
+						if ($base == 'libraries/' AND is_file($fullpath.ucfirst($file_ext))) {
+							return array($fullpath, ucfirst($file));
+						}
+						
+						//log_message('debug', "Checking to see if $fullpath$file_ext exists: ". ((is_file($fullpath.$file_ext)) ? '**yes**' : 'no' ));
+						if (is_file($fullpath.$file_ext)) return array($fullpath, $file);
+					}
+				}
 			}
 		}
 		
@@ -194,18 +235,33 @@ class Modules
 	}
 	
 	/** Parse module routes **/
-	public static function parse_routes($module, $uri) {
-		
-		/* load the route file */
+	public static function parse_routes($module, $uri, $locations = array()) {
+	
+		/* load the route file and merge routes if more than one location is read */
 		if ( ! isset(self::$routes[$module])) {
-			if (list($path) = self::find('routes', $module, 'config/') AND $path)
-				self::$routes[$module] = self::load_file('routes', $path, 'route');
+			self::$routes[$module] = array();
+						
+			if(empty($locations)) {
+				if (list($path) = self::find('routes', $module, 'config/') AND $path) {
+					self::$routes[$module] = self::load_file('routes', $path, 'route');
+				}
+			}
+			else {
+				foreach($locations as $module => $locations) {
+					foreach($locations as $location) {
+						if (list($path) = self::find('routes', $module, 'config/', $location) AND $path) {
+							self::$routes[$module] = array_merge(self::$routes[$module], self::load_file('routes', $path, 'route'));
+						}
+					}
+				}
+			}
 		}
-
+		
 		if ( ! isset(self::$routes[$module])) return;
 			
 		/* parse module routes */
-		foreach (self::$routes[$module] as $key => $val) {						
+		foreach (self::$routes[$module] as $key => $val) {
+			//log_message('debug', "-- Found route rule: $key -> " . (($val) ? $val : '[Removed this default route]'));
 					
 			$key = str_replace(array(':any', ':num'), array('.+', '[0-9]+'), $key);
 			
@@ -214,6 +270,9 @@ class Modules
 					$val = preg_replace('#^'.$key.'$#', $val, $uri);
 				}
 
+				if(array_shift(explode("/", $val))) {
+					log_message('debug', "**** Found matching route '$uri' in module '$module', controller '" . array_shift(explode("/", $val)) . "', method '" . array_pop(explode("/", $val)) . "'");
+				}
 				return explode('/', $module.'/'.$val);
 			}
 		}

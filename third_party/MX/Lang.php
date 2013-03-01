@@ -32,6 +32,13 @@
  * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
+ *
+ * This is a forked version of the original Modular Extensions - HMVC library to
+ * support better module routing, and speed optimizations. These additional
+ * changes were made by:
+ * 
+ * @author		Brian Wozeniak
+ * @copyright	Copyright (c) 1998-2012, Unmelted, LLC
  **/
 class MX_Lang extends CI_Lang
 {
@@ -49,7 +56,9 @@ class MX_Lang extends CI_Lang
 			return $this->language;
 
 		$_module OR $_module = CI::$APP->router->fetch_module();
-		list($path, $_langfile) = Modules::find($langfile.'_lang', $_module, 'language/'.$idiom.'/');
+		$_module_location = CI::$APP->router->fetch_location();
+		
+		list($path, $_langfile) = Modules::find($langfile.'_lang', $_module, 'language/'.$idiom.'/', $_module_location);
 
 		if ($path === FALSE) {
 			

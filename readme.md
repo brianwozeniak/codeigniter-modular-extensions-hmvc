@@ -1,3 +1,81 @@
+# Modular Extensions - HMVC (a forked version with better module routing, speed optimizations)
+
+You can find the main repo here:
+
+https://bitbucket.org/wiredesignz/codeigniter-modular-extensions-hmvc
+
+This is a fork via bitbucket commit #868e975 to this github repo.
+
+There are two reasons for having this on GitHub as opposed to a Mercurial repo on bitbucket. The first was to have a repo on GitHub that I can easily pull from for my projects, and the second was to add support for better custom routing within modules.
+
+Wiredesignz did an awesome job with the HMVC extension, however, it would not pick up custom routing files in modules if the first segment of the URI did not match the module's directory name. With my modules I don't necessary always want the route to have to start with the module name for the first segment. Let me explain with an example:
+
+If the URI requested is this:
+
+first-segment/second-segment
+
+What happens normally with Wiredesignz implementation is that first the routing is looked up at:
+
+application/config/routes.php
+
+If nothing is found there that matches the request, then the "first-segment" is used as the module name and searched for in all of your module locations to see if anything matches. In my case I have numerous module locations to act as categories, to make my modules more organized by their purpose. So in this case it looks for a module named "first-segment" in every single module location. If no module name matches "first-segment" in all those locations, then the default controller or 404 controller is loaded next and it ends here.
+
+What I wanted was for these first two steps to happen similiary, but in the case nothing is found after the first two steps, I then wanted all routes.php files to be processed from all modules in all module locations to see if anything exists that matches the URI requested. If any routes match, then the appropriate module's controller and method would be used, otherwise it would proceed as normal to the default or 404 controller. So in other words if you use this fork and still setup your modules and URIs the same as before where the first segment matches the module's name, then the 3rd step would never be processed since it would be found in step 2. For that case, the only time the third method would be processed is if someone comes to your website to a route that doesn't exist as it will try to search through everything at that point parsing all of the routing files.
+
+There will be a negligible hit to peformance if you use routes that don't start with your module's name since more locations are searched and more routes.php file are loaded, however the cost is small and for me worth keep everything contained within modules if you like to keep custom module routing there to make it easier to use in other applications. Simply drop it in a module location and that is it, no worrying about adding routes if the module name doesn't match the route you want to use to load a controller. I did some before and after tests using the original versus this forked version and it took approximately 0.005 seconds longer with the forked version. So the performance hit seems very small if that is important to you.
+
+However with the above changes that decrease performance ever so slightly, we also made numerous other changes that speed up performance. The original extension by wiredesignz was inefficient when it came down to locating modules and controllers due to the fact that for each one it tried to find, it would search every single module location again for every single module to see what it can find. This is redundant since the same exact paths were already searched before if you had more than one module. This version actually maps out all the locations of every module and then caches that result so that when needing to load a module's controller, library, etc, it doesn't have to search all over the place again as it already knows exactly where to look. So if you have quite a few modules these changes should help offset some of the performance costs of having these extra features.
+
+Finally before by default your module location will automatically be seen as a route if the controller name matches the module name unless otherwise specified. I didn't like this as I could easily see forgetting to make a module unaccessable and thus creating unwanted access via a direct URL if only other controllers should have access to a module. For example if you have something at yourmodule/yourcontroller/yourmethod where yourcontroller actually has the same name as yourmodule, then that URI as well as yourmodule or yourmodule/yourmodule would also work unless you add something like this contained in your module/config/routes.php file:
+
+/*
+|--------------------------------------------------------------------------
+| Remove the default route set by the module extensions
+|--------------------------------------------------------------------------
+|
+| Normally by default this route is accepted:
+|
+| module/controller/method
+|
+| If you do not want to allow access via that route you should add:
+|
+| $route['module'] = "";
+| $route['module/(:any)'] = "";
+|
+*/
+$route['yourmodule'] = "";
+$route['yourmodule/(:any)'] = "";
+
+/*
+|--------------------------------------------------------------------------
+| Routes to accept
+|--------------------------------------------------------------------------
+|
+| Map all of your valid module routes here such as:
+|
+| $route['your/custom/route'] = "controller/method";
+|
+*/
+$route['good-route'] = "yourcontroller/yourmethod";
+
+// Original version would have to have yourmodule at the start of the route for the routes.php to be read
+$route['yourmodule/good-route'] = "yourcontroller/yourmethod";
+
+So that is the work around, unfortunately I tend to overlook things and could easily forget to setup that rule at the start to remove the default route for the module and it's controllers. So with this fork by default all those routes are removed and only routes you specify will work. You can change this behavior if you woud like by editing the Router.php file and changing:
+
+protected static $remove_default_routes = TRUE;
+
+to
+
+protected static $remove_default_routes = FALSE;
+
+### Final words on this fork
+
+Keep in mind new bugs may be introduced from this fork. If you find any bugs or have any fixes would love to hear from you so that they can be addressed. Use at your own risk and with plenty of testing.
+
+
+Here is the original documentation provided by wiredesignz for reference:
+
 ### Support development of Modular Extensions - HMVC
 [![Support development](https://www.paypal.com/en_US/i/btn/btn_donateCC_LG.gif "Support Development")](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=FK79XNCUE9P5C)
 

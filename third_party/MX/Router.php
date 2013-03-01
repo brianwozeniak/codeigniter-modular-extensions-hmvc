@@ -34,13 +34,74 @@ require dirname(__FILE__).'/Modules.php';
  * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
+ *
+ * This is a forked version of the original Modular Extensions - HMVC library to
+ * support better module routing, and speed optimizations. These additional
+ * changes were made by:
+ * 
+ * @author		Brian Wozeniak
+ * @copyright	Copyright (c) 1998-2012, Unmelted, LLC
  **/
 class MX_Router extends CI_Router
 {
 	protected $module;
+	protected $location;
+	protected $map = array();
+	protected $remove_default_routes = TRUE;
 	
 	public function fetch_module() {
 		return $this->module;
+	}
+	
+	public function fetch_location() {
+		return $this->location;
+	}
+	
+	/**
+	 * A simple function which maps out exactly what path a module is located. It will
+	 * also cache the results to avoid extra work and allows a specific module to be
+	 * looked up or all modules and their locations returned.
+	 *
+	 * @param string $module The module to lookup, leave blank to return all
+	 * @return array A list of all module paths or filtered to a specified module
+	 */
+	public function module_map($module = false) {
+
+		// If we have already done this, use the cached results
+		if(!empty($this->map)) {
+
+			// If a directory which holds modules is specified, only return those
+			if($module) {
+				if(!isset($this->map[$module])) {
+					return array();
+				}
+				return array($module => $this->map[$module]);
+			}
+			
+			// Otherwise return the full associative array of modules and their locations
+			return $this->map;
+		}
+		// Since no cached results exist, lets do the work!
+		else {
+			// Go through each directory that contains modules
+			foreach (Modules::$locations as $location => $offset) {
+	
+				// Get all modules(folders) in the folder that holds modules
+				$directories = array();
+				if ($fp = @opendir($location)) {
+					while (FALSE !== ($file = readdir($fp))) {
+						if (trim($file, '.') && $file[0] != '.' && @is_dir($location . $file)) {
+							$this->map[$file][] = $location;
+						}
+					}
+				}
+			}
+
+			// Everything is cached, now return the results by running func again
+			if(!empty($this->map)) {
+				return $this->module_map($module);
+			}
+		}
 	}
 	
 	public function _validate_request($segments) {
@@ -57,7 +118,7 @@ class MX_Router extends CI_Router
 		}
 		
 		/* no controller found */
-		show_404();
+		show_404($this->uri->uri_string);
 	}
 	
 	/** Locate the controller **/
@@ -65,50 +126,79 @@ class MX_Router extends CI_Router
 		
 		$this->module = '';
 		$this->directory = '';
+		$this->location = '';
+		$routes = '';
 		$ext = $this->config->item('controller_suffix').EXT;
+		$uri = implode("/", $segments);
 		
-		/* use module route if available */
-		if (isset($segments[0]) AND $routes = Modules::parse_routes($segments[0], implode('/', $segments))) {
+		/* use module route if available and use exact module location if exists */
+		if (isset($segments[0]) && $this->module_map($segments[0]) AND $routes = Modules::parse_routes($segments[0], $uri, $this->module_map($segments[0]))) {
 			$segments = $routes;
 		}
-	
+		// Otherwise go through all module routes and stop at the first match if any (lower precedence)
+		elseif(isset($segments[0])) {
+			//log_message('debug', "Scanning for first match in all modules' routing files with the URI segment: " . $uri);
+			
+			//Get all of the module names and locations
+			$directories = $this->module_map();
+				
+			foreach($directories as $module => $locations) {
+				if($routes = Modules::parse_routes($module, $uri, array($module => $locations))) {
+					$segments = $routes;
+
+					//Since a route is found, no need to keep looking, break out of loop
+					break;
+				}
+			}
+		}
+
+		// Should all modules be unaccessable unless a route explicitly matches?
+		if($this->remove_default_routes && empty($routes) && $this->routes['default_controller'] != $uri && $this->routes['404_override'] != $uri) {
+			return;
+		}
+
 		/* get the segments array elements */
 		list($module, $directory, $controller) = array_pad($segments, 3, NULL);
 
 		/* check modules */
-		foreach (Modules::$locations as $location => $offset) {
+		$directories = $this->module_map($module);
 		
-			/* module exists? */
-			if (is_dir($source = $location.$module.'/controllers/')) {
-				
-				$this->module = $module;
-				$this->directory = $offset.$module.'/controllers/';
-				
-				/* module sub-controller exists? */
-				if($directory AND is_file($source.$directory.$ext)) {
-					return array_slice($segments, 1);
-				}
+		foreach ($directories as $module => $locations) {
+			foreach($locations as $location) {
+				$offset = Modules::$locations[$location];
+
+				/* module exists? */
+				if (is_dir($source = $location.$module.'/controllers/')) {
+					$this->module = $module;
+					$this->directory = $offset.$module.'/controllers/';
+					$this->location = $location;
 					
-				/* module sub-directory exists? */
-				if($directory AND is_dir($source.$directory.'/')) {
-
-					$source = $source.$directory.'/'; 
-					$this->directory .= $directory.'/';
-
-					/* module sub-directory controller exists? */
-					if(is_file($source.$directory.$ext)) {
+					/* module sub-controller exists? */
+					if($directory AND is_file($source.$directory.$ext)) {
 						return array_slice($segments, 1);
 					}
-				
-					/* module sub-directory sub-controller exists? */
-					if($controller AND is_file($source.$controller.$ext))	{
-						return array_slice($segments, 2);
+						
+					/* module sub-directory exists? */
+					if($directory AND is_dir($source.$directory.'/')) {
+
+						$source = $source.$directory.'/'; 
+						$this->directory .= $directory.'/';
+
+						/* module sub-directory controller exists? */
+						if(is_file($source.$directory.$ext)) {
+							return array_slice($segments, 1);
+						}
+					
+						/* module sub-directory sub-controller exists? */
+						if($controller AND is_file($source.$controller.$ext))	{
+							return array_slice($segments, 2);
+						}
 					}
-				}
-				
-				/* module controller exists? */			
-				if(is_file($source.$module.$ext)) {
-					return $segments;
+					
+					/* module controller exists? */			
+					if(is_file($source.$module.$ext)) {
+						return $segments;
+					}
 				}
 			}
 		}

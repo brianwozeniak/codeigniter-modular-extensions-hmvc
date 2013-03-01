@@ -32,10 +32,18 @@
  * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
+ *
+ * This is a forked version of the original Modular Extensions - HMVC library to
+ * support better module routing, and speed optimizations. These additional
+ * changes were made by:
+ * 
+ * @author		Brian Wozeniak
+ * @copyright	Copyright (c) 1998-2012, Unmelted, LLC
  **/
 class MX_Loader extends CI_Loader
 {
 	protected $_module;
+	protected $_module_location;
 	
 	public $_ci_plugins = array();
 	public $_ci_cached_vars = array();
@@ -45,6 +53,9 @@ class MX_Loader extends CI_Loader
 		
 		/* set the module name */
 		$this->_module = CI::$APP->router->fetch_module();
+		
+		/* set the module location */
+		$this->_module_location = CI::$APP->router->fetch_location();
 		
 		if (is_a($controller, 'MX_Controller')) {	
 			
@@ -66,21 +77,18 @@ class MX_Loader extends CI_Loader
 		}
 		
 		/* add this module path to the loader variables */
-		$this->_add_module_paths($this->_module);
+		$this->_add_module_paths($this->_module, $this->_module_location);
 	}
 
 	/** Add a module path loader variables **/
-	public function _add_module_paths($module = '') {
+	public function _add_module_paths($module = '', $location = FALSE) {
 		
 		if (empty($module)) return;
 		
-		foreach (Modules::$locations as $location => $offset) {
-			
-			/* only add a module path if it exists */
-			if (is_dir($module_path = $location.$module.'/') && ! in_array($module_path, $this->_ci_model_paths)) 
-			{
-				array_unshift($this->_ci_model_paths, $module_path);
-			}
+		/* only add a module path if it exists */
+		if (is_dir($module_path = $location.$module.'/') && ! in_array($module_path, $this->_ci_model_paths)) 
+		{
+			array_unshift($this->_ci_model_paths, $module_path);
 		}
 	}	
 	
@@ -111,7 +119,7 @@ class MX_Loader extends CI_Loader
 		
 		if (isset($this->_ci_helpers[$helper]))	return;
 
-		list($path, $_helper) = Modules::find($helper.'_helper', $this->_module, 'helpers/');
+		list($path, $_helper) = Modules::find($helper.'_helper', $this->_module, 'helpers/', $this->_module_location);
 
 		if ($path === FALSE) return parent::helper($helper);
 
@@ -145,11 +153,11 @@ class MX_Loader extends CI_Loader
 			
 		($_alias = strtolower($object_name)) OR $_alias = $class;
 		
-		list($path, $_library) = Modules::find($library, $this->_module, 'libraries/');
+		list($path, $_library) = Modules::find($library, '', 'libraries/');
 		
 		/* load library config file as params */
 		if ($params == NULL) {
-			list($path2, $file) = Modules::find($_alias, $this->_module, 'config/');	
+			list($path2, $file) = Modules::find($_alias, '', 'config/');	
 			($path2) AND $params = Modules::load_file($file, $path2, 'config');
 		}	
 			
@@ -163,9 +171,18 @@ class MX_Loader extends CI_Loader
 			Modules::load_file($_library, $path);
 			
 			$library = ucfirst($_library);
-			CI::$APP->$_alias = new $library($params);
-			
+
+			// Small but important change. Moved this above loading the new library below
+			// as in some isolated situations an infinite loop can happen if a library
+			// is using a duplicate alias name as a controller, and that controller or
+			// parent controller has tried to load the library again which mistakenly calls
+			// the clashed controller which calls what thinks is the library again over and
+			// over (but really it is calling itself). Can be confusing, and the
+			// preferred method would be to fail instantiating a new class or overwriting
+			// the other alias that exists instead of going into an infinite loop.
 			$this->_ci_classes[$class] = $_alias;
+			
+			CI::$APP->$_alias = new $library($params);			
 		}
 		
 		return CI::$APP->$_alias;
@@ -187,7 +204,7 @@ class MX_Loader extends CI_Loader
 			return CI::$APP->$_alias;
 			
 		/* check module */
-		list($path, $_model) = Modules::find(strtolower($model), $this->_module, 'models/');
+		list($path, $_model) = Modules::find(strtolower($model), $this->_module, 'models/', $this->_module_location);
 		
 		if ($path == FALSE) {
 			
@@ -242,7 +259,7 @@ class MX_Loader extends CI_Loader
 		if (isset($this->_ci_plugins[$plugin]))	
 			return;
 
-		list($path, $_plugin) = Modules::find($plugin.'_pi', $this->_module, 'plugins/');	
+		list($path, $_plugin) = Modules::find($plugin.'_pi', $this->_module, 'plugins/', $this->_module_location);	
 		
 		if ($path === FALSE AND ! is_file($_plugin = APPPATH.'plugins/'.$_plugin.EXT)) {	
 			show_error("Unable to locate the plugin file: {$_plugin}");
@@ -259,7 +276,7 @@ class MX_Loader extends CI_Loader
 
 	/** Load a module view **/
 	public function view($view, $vars = array(), $return = FALSE) {
-		list($path, $_view) = Modules::find($view, $this->_module, 'views/');
+		list($path, $_view) = Modules::find($view, $this->_module, 'views/', $this->_module_location);
 		
 		if ($path != FALSE) {
 			$this->_ci_view_paths = array($path => TRUE) + $this->_ci_view_paths;
@@ -339,14 +356,14 @@ class MX_Loader extends CI_Loader
 		
 		if ($this->_module) {
 			
-			list($path, $file) = Modules::find('constants', $this->_module, 'config/');	
+			list($path, $file) = Modules::find('constants', $this->_module, 'config/', $this->_module_location);	
 			
 			/* module constants file */
 			if ($path != FALSE) {
 				include_once $path.$file.EXT;
 			}
 					
-			list($path, $file) = Modules::find('autoload', $this->_module, 'config/');
+			list($path, $file) = Modules::find('autoload', $this->_module, 'config/', $this->_module_location);
 		
 			/* module autoload file */
 			if ($path != FALSE) {
