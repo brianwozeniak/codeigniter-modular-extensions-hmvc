@@ -28,7 +28,6 @@ However with the above changes that decrease performance ever so slightly, we al
 
 Finally before by default your module location will automatically be seen as a route if the controller name matches the module name unless otherwise specified. I didn't like this as I could easily see forgetting to make a module unaccessable and thus creating unwanted access via a direct URL if only other controllers should have access to a module. For example if you have something at yourmodule/yourcontroller/yourmethod where yourcontroller actually has the same name as yourmodule, then that URI as well as yourmodule or yourmodule/yourmodule would also work unless you add something like this contained in your module/config/routes.php file:
 
-	:::php
 	<?php if ( ! defined('BASEPATH')) exit('No direct script access allowed');
 	/*
 	|--------------------------------------------------------------------------
