@@ -28,38 +28,40 @@ However with the above changes that decrease performance ever so slightly, we al
 
 Finally before by default your module location will automatically be seen as a route if the controller name matches the module name unless otherwise specified. I didn't like this as I could easily see forgetting to make a module unaccessable and thus creating unwanted access via a direct URL if only other controllers should have access to a module. For example if you have something at yourmodule/yourcontroller/yourmethod where yourcontroller actually has the same name as yourmodule, then that URI as well as yourmodule or yourmodule/yourmodule would also work unless you add something like this contained in your module/config/routes.php file:
 
-/*
-|--------------------------------------------------------------------------
-| Remove the default route set by the module extensions
-|--------------------------------------------------------------------------
-|
-| Normally by default this route is accepted:
-|
-| module/controller/method
-|
-| If you do not want to allow access via that route you should add:
-|
-| $route['module'] = "";
-| $route['module/(:any)'] = "";
-|
-*/
-$route['yourmodule'] = "";
-$route['yourmodule/(:any)'] = "";
+	:::php
+	<?php if ( ! defined('BASEPATH')) exit('No direct script access allowed');
+	/*
+	|--------------------------------------------------------------------------
+	| Remove the default route set by the module extensions
+	|--------------------------------------------------------------------------
+	|
+	| Normally by default this route is accepted:
+	|
+	| module/controller/method
+	|
+	| If you do not want to allow access via that route you should add:
+	|
+	| $route['module'] = "";
+	| $route['module/(:any)'] = "";
+	|
+	*/
+	$route['yourmodule'] = "";
+	$route['yourmodule/(:any)'] = "";
 
-/*
-|--------------------------------------------------------------------------
-| Routes to accept
-|--------------------------------------------------------------------------
-|
-| Map all of your valid module routes here such as:
-|
-| $route['your/custom/route'] = "controller/method";
-|
-*/
-$route['good-route'] = "yourcontroller/yourmethod";
+	/*
+	|--------------------------------------------------------------------------
+	| Routes to accept
+	|--------------------------------------------------------------------------
+	|
+	| Map all of your valid module routes here such as:
+	|
+	| $route['your/custom/route'] = "controller/method";
+	|
+	*/
+	$route['good-route'] = "yourcontroller/yourmethod";
 
-// Original version would have to have yourmodule at the start of the route for the routes.php to be read
-$route['yourmodule/good-route'] = "yourcontroller/yourmethod";
+	// Original version would have to have yourmodule at the start of the route for the routes.php to be read
+	$route['yourmodule/good-route'] = "yourcontroller/yourmethod";
 
 So that is the work around, unfortunately I tend to overlook things and could easily forget to setup that rule at the start to remove the default route for the module and it's controllers. So with this fork by default all those routes are removed and only routes you specify will work. You can change this behavior if you woud like by editing the Router.php file and changing:
 
