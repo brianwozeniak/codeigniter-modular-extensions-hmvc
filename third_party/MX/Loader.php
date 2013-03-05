@@ -171,6 +171,16 @@ class MX_Loader extends CI_Loader
 			Modules::load_file($_library, $path);
 			
 			$library = ucfirst($_library);
+			
+			//Make sure to also check if a module's library should be overriding a CI library
+			if (class_exists('CI_'.$library))
+			{
+				$library = 'CI_'.$library;
+			}
+			elseif (class_exists(config_item('subclass_prefix').$library))
+			{
+				$library = config_item('subclass_prefix').$library;
+			}
 
 			// Small but important change. Moved this above loading the new library below
 			// as in some isolated situations an infinite loop can happen if a library
