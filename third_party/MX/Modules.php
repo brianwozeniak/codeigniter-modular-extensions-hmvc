@@ -216,6 +216,11 @@ class Modules
 			foreach($modules as $module => $subpath) {
 				$directories = CI::$APP->router->module_map($module);
 				
+				//If no directories are returned for the module above, then search all
+				if(empty($directories)) {
+					$directories = CI::$APP->router->module_map();
+				}
+				
 				foreach($directories as $module => $locations) {
 					foreach($locations as $location) {
 						$fullpath = $location.$module.'/'.$base.$subpath;
