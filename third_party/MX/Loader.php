@@ -157,7 +157,12 @@ class MX_Loader extends CI_Loader
 		
 		/* load library config file as params */
 		if ($params == NULL) {
-			list($path2, $file) = Modules::find($_alias, '', 'config/');	
+			list($path2, $file) = Modules::find($_alias, '', 'config/');
+			
+			if (defined('ENVIRONMENT') AND file_exists($path2.ENVIRONMENT.'/'.$file.'.php')) {
+				$path2 = $path2.ENVIRONMENT.'/';
+			}
+
 			($path2) AND $params = Modules::load_file($file, $path2, 'config');
 		}	
 			

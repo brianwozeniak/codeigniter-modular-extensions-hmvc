@@ -57,6 +57,10 @@ class MX_Config extends CI_Config
 			return $this->item($file);
 		}  
 		
+		if (defined('ENVIRONMENT') AND file_exists($path.ENVIRONMENT.'/'.$file.'.php')) {
+			$path = $path.ENVIRONMENT.'/';
+		}
+		
 		if ($config = Modules::load_file($file, $path, 'config')) {
 			
 			/* reference to the config array */
