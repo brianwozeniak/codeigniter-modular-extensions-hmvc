@@ -153,7 +153,7 @@ class MX_Router extends CI_Router
 		}
 
 		// Should all modules be unaccessable unless a route explicitly matches?
-		if($this->remove_default_routes && empty($routes) && $this->routes['default_controller'] != $uri && $this->routes['404_override'] != $uri) {
+		if($this->remove_default_routes && empty($routes) && (!in_array($uri, array_values($this->routes))) ) {
 			return;
 		}
 
