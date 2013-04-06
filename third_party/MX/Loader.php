@@ -38,7 +38,7 @@
  * changes were made by:
  * 
  * @author		Brian Wozeniak
- * @copyright	Copyright (c) 1998-2012, Unmelted, LLC
+ * @copyright	Copyright (c) 1998-2013, Unmelted, LLC
  **/
 class MX_Loader extends CI_Loader
 {
@@ -119,7 +119,15 @@ class MX_Loader extends CI_Loader
 		
 		if (isset($this->_ci_helpers[$helper]))	return;
 
-		list($path, $_helper) = Modules::find($helper.'_helper', $this->_module, 'helpers/', $this->_module_location);
+		list($path, $_helper, $ext_helper) = Modules::find($helper.'_helper', $this->_module, 'helpers/', $this->_module_location);
+
+		// Are we simply loading an extended helper?
+		if($ext_helper) {
+			Modules::load_file(config_item('subclass_prefix').$_helper, $path);
+			
+			// Force the helper we are extending to load as well
+			$path = FALSE;
+		}
 
 		if ($path === FALSE) return parent::helper($helper);
 

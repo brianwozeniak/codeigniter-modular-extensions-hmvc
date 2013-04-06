@@ -152,8 +152,14 @@ class MX_Router extends CI_Router
 			}
 		}
 
+		// Let's see where the request originated ie, from a module or router, (is there a better way?)
+		// If it comes from a router that assumes it is being loaded via a public website address, if it comes from
+		// a module then that means it was called from somewhere internally.
+		$trace = debug_backtrace();
+		$module_source = ($trace[1]['class'] == 'Modules' && $trace[1]['function'] == 'load');
+		
 		// Should all modules be unaccessable unless a route explicitly matches?
-		if($this->remove_default_routes && empty($routes) && (!in_array($uri, array_values($this->routes))) ) {
+		if($this->remove_default_routes && !$module_source && empty($routes) && (!in_array($uri, array_values($this->routes))) ) {
 			return;
 		}
 

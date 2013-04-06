@@ -166,20 +166,26 @@ class Modules
 		return $result;
 	}
 
-	/** 
-	* Find a file
-	* Scans for files located within modules directories.
-	* Also scans application directories for models, plugins and views.
-	* Generates fatal error if file not found.
-	**/
-	public static function find($file, $module, $base, $location = false) {
-	
+	/**
+	 * Find a file
+	 * Scans for files located within modules directories.
+	 * Also scans application directories for models, plugins and views.
+	 * Returns the first result found, not all results
+	 * 
+	 * @param string $file
+	 * @param string $module
+	 * @param string $base
+	 * @param string $location
+	 * @return array Returns the location, filename, and TRUE if it is an extension to a helper
+	 */
+	public static function find($file, $module, $base, $location = '') {
+			
 		$segments = explode('/', $file);
 
 		$file = array_pop($segments);
 		$file_ext = (pathinfo($file, PATHINFO_EXTENSION)) ? $file : $file.EXT;
 		
-		$path = ltrim(implode('/', $segments).'/', '/');	
+		$path = ltrim(implode('/', $segments).'/', '/');
 		$modules = array();
 		
 		// We want to execute the below first under the assumption that the $file contains
@@ -189,7 +195,7 @@ class Modules
 		if ( ! empty($segments)) {
 			$modules[array_shift($segments)] = ltrim(implode('/', $segments).'/','/');			
 		}
-
+		
 		// If $module arg exists, then add as a place to search with $file as full path
 		// as it would then be assumed to have no module in that first arg then
 		if ($module && !isset($modules[$module])) {
@@ -205,10 +211,15 @@ class Modules
 				$fullpath = $location.$module.'/'.$base.$subpath;
 					
 				if ($base == 'libraries/' AND is_file($fullpath.ucfirst($file_ext)))
-					return array($fullpath, ucfirst($file));
+					return array($fullpath, ucfirst($file), FALSE);
+				
+				// Is there a possible helper extension here?
+				if($base == 'helpers/' && is_file($fullpath.config_item('subclass_prefix').$file_ext)) {
+					return array($fullpath, $file, TRUE);								
+				}
 
 				//log_message('debug', "Checking to see if $fullpath$file_ext exists: ". ((is_file($fullpath.$file_ext)) ? '**yes**' : 'no' ));
-				if (is_file($fullpath.$file_ext)) return array($fullpath, $file);
+				if (is_file($fullpath.$file_ext)) return array($fullpath, $file, FALSE);
 			}	
 		}
 		else {
@@ -226,17 +237,22 @@ class Modules
 						$fullpath = $location.$module.'/'.$base.$subpath;
 					
 						if ($base == 'libraries/' AND is_file($fullpath.ucfirst($file_ext))) {
-							return array($fullpath, ucfirst($file));
+							return array($fullpath, ucfirst($file), FALSE);
+						}
+						
+						// Is there a possible helper extension here?
+						if($base == 'helpers/' && is_file($fullpath.config_item('subclass_prefix').$file_ext)) {
+							return array($fullpath, $file, TRUE);								
 						}
 						
 						//log_message('debug', "Checking to see if $fullpath$file_ext exists: ". ((is_file($fullpath.$file_ext)) ? '**yes**' : 'no' ));
-						if (is_file($fullpath.$file_ext)) return array($fullpath, $file);
+						if (is_file($fullpath.$file_ext)) return array($fullpath, $file, FALSE);
 					}
 				}
 			}
 		}
 		
-		return array(FALSE, $file);	
+		return array(FALSE, $file, FALSE);	
 	}
 	
 	/** Parse module routes **/
