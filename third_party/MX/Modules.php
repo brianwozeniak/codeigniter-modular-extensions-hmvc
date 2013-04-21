@@ -50,7 +50,7 @@ spl_autoload_register('Modules::autoload');
  * changes were made by:
  * 
  * @author		Brian Wozeniak
- * @copyright	Copyright (c) 1998-2012, Unmelted, LLC
+ * @copyright	Copyright (c) 1998-2013, Unmelted, LLC
  **/
 class Modules
 {
@@ -188,6 +188,11 @@ class Modules
 		$path = ltrim(implode('/', $segments).'/', '/');
 		$modules = array();
 		
+		// If we have multiple segments, we don't need location as user may want location outside that area
+		if($path) {
+			$location = '';
+		}
+		
 		// We want to execute the below first under the assumption that the $file contains
 		// the module as well in the segment, and if so is assumed to be most likely the
 		// correct location, and this limits how much searching we do as if found it
@@ -206,6 +211,7 @@ class Modules
 			$modules[$file] = $path;
 		}
 		
+		// Check this first as this is likely the correct area
 		if($location) {
 			foreach($modules as $module => $subpath) {
 				$fullpath = $location.$module.'/'.$base.$subpath;

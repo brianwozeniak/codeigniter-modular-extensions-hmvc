@@ -53,12 +53,12 @@ class MX_Loader extends CI_Loader
 		
 		/* set the module name */
 		$this->_module = CI::$APP->router->fetch_module();
-		
-		/* set the module location */
-		$this->_module_location = CI::$APP->router->fetch_location();
-		
+	
 		if (is_a($controller, 'MX_Controller')) {	
-			
+		
+			/* set the module location */
+			$this->_module_location = CI::$APP->router->fetch_location();
+
 			/* reference to the module controller */
 			$this->controller = $controller;
 			
@@ -126,6 +126,8 @@ class MX_Loader extends CI_Loader
 			Modules::load_file(config_item('subclass_prefix').$_helper, $path);
 			
 			// Force the helper we are extending to load as well
+			$segments = explode('/', $helper);
+			$helper = isset($segments[1]) ? $segments[1] : $helper;
 			$path = FALSE;
 		}
 
