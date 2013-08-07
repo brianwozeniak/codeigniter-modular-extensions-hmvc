@@ -42,6 +42,15 @@
  **/
 class MX_Loader extends CI_Loader
 {
+	/**
+	 * If true, then load times of modules are displayed under benchmarks
+	 * 
+	 * @var bool
+	 */
+	private $module_benchmarks = FALSE;
+	
+	public static $loaded_benchmarks = 0; // possibly temporary to track benchmarks below
+	
 	protected $_module;
 	protected $_module_location;
 	
@@ -53,12 +62,12 @@ class MX_Loader extends CI_Loader
 		
 		/* set the module name */
 		$this->_module = CI::$APP->router->fetch_module();
-	
-		if (is_a($controller, 'MX_Controller')) {	
 		
+		if (is_a($controller, 'MX_Controller')) {	
+			
 			/* set the module location */
 			$this->_module_location = CI::$APP->router->fetch_location();
-
+			
 			/* reference to the module controller */
 			$this->controller = $controller;
 			
@@ -84,7 +93,7 @@ class MX_Loader extends CI_Loader
 	public function _add_module_paths($module = '', $location = FALSE) {
 		
 		if (empty($module)) return;
-		
+
 		/* only add a module path if it exists */
 		if (is_dir($module_path = $location.$module.'/') && ! in_array($module_path, $this->_ci_model_paths)) 
 		{
@@ -118,7 +127,7 @@ class MX_Loader extends CI_Loader
 		if (is_array($helper)) return $this->helpers($helper);
 		
 		if (isset($this->_ci_helpers[$helper]))	return;
-
+		
 		list($path, $_helper, $ext_helper) = Modules::find($helper.'_helper', $this->_module, 'helpers/', $this->_module_location);
 
 		// Are we simply loading an extended helper?
@@ -130,7 +139,7 @@ class MX_Loader extends CI_Loader
 			$helper = isset($segments[1]) ? $segments[1] : $helper;
 			$path = FALSE;
 		}
-
+		
 		if ($path === FALSE) return parent::helper($helper);
 
 		Modules::load_file($_helper, $path);
@@ -154,12 +163,22 @@ class MX_Loader extends CI_Loader
 	/** Load a module library **/
 	public function library($library = '', $params = NULL, $object_name = NULL) {
 		
-		if (is_array($library)) return $this->libraries($library);		
-		
+		if (is_array($library)) return $this->libraries($library);
+	
 		$class = strtolower(basename($library));
 
-		if (isset($this->_ci_classes[$class]) AND $_alias = $this->_ci_classes[$class])
+		if (isset($this->_ci_classes[$class]) AND $_alias = $this->_ci_classes[$class]) {
+			log_message('debug', "Skipping loading $class library as it has already loaded or another alias already exists with same name that conflicts");
 			return CI::$APP->$_alias;
+		}
+		
+		// Below for benchmark tracking
+		if($this->module_benchmarks) {
+			$BM =& load_class('Benchmark', 'core');
+			self::$loaded_benchmarks++;
+			$benchmark = 'library ' . self::$loaded_benchmarks . ':_( ' . str_replace('/', ' / ', $library) .  ' )';
+			$BM->mark($benchmark . '_start');
+		}
 			
 		($_alias = strtolower($object_name)) OR $_alias = $class;
 		
@@ -196,18 +215,25 @@ class MX_Loader extends CI_Loader
 			{
 				$library = config_item('subclass_prefix').$library;
 			}
-
-			// Small but important change. Moved this above loading the new library below
-			// as in some isolated situations an infinite loop can happen if a library
-			// is using a duplicate alias name as a controller, and that controller or
-			// parent controller has tried to load the library again which mistakenly calls
-			// the clashed controller which calls what thinks is the library again over and
-			// over (but really it is calling itself). Can be confusing, and the
-			// preferred method would be to fail instantiating a new class or overwriting
-			// the other alias that exists instead of going into an infinite loop.
+			
+			//Small but important change. Moved this above loading the new library below
+			//as in some isolated situations an infinite loop can happen if a library
+			//is using a duplicate alias name as a controller, and that controller or
+			//parent controller has tried to load the library again which mistakenly calls
+			//the clashed controller which calls what thinks is the library again over and
+			//over (but really it is calling itself). Can be confusing, and the
+			//preferred method would be to fail instantiating a new class or overwriting
+			//the other alias that exists instead of going into an infinite loop.
 			$this->_ci_classes[$class] = $_alias;
 			
-			CI::$APP->$_alias = new $library($params);			
+			CI::$APP->$_alias = new $library($params);
+			
+			
+		}		
+
+		// Below for benchmark tracking
+		if($this->module_benchmarks) {
+			$BM->mark($benchmark . '_end');
 		}
 		
 		return CI::$APP->$_alias;
@@ -301,7 +327,8 @@ class MX_Loader extends CI_Loader
 
 	/** Load a module view **/
 	public function view($view, $vars = array(), $return = FALSE) {
-		list($path, $_view) = Modules::find($view, $this->_module, 'views/', $this->_module_location);
+		// If a view begins with an underscore, it should be looked everywhere
+		list($path, $_view) = Modules::find($view, (!isset($view[0]) || $view[0] != '_') ? $this->_module : '', 'views/', (!isset($view[0]) || $view[0] != '_') ? $this->_module_location : '');
 		
 		if ($path != FALSE) {
 			$this->_ci_view_paths = array($path => TRUE) + $this->_ci_view_paths;
