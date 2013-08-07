@@ -76,7 +76,7 @@ class Modules
 				$args = func_get_args();
 				$output = call_user_func_array(array($class, $method), array_slice($args, 1));
 				$buffer = ob_get_clean();
-				return ($output !== NULL) ? $output : $buffer;
+				return ($output != NULL) ? $output : $buffer;
 			}
 		}
 		
@@ -137,7 +137,7 @@ class Modules
 		if(is_file($location = APPPATH.'libraries/'.$class.EXT)) {
 			include_once $location;
 			return;
-		}		
+		}
 	}
 
 	/** Load a module file **/
@@ -199,6 +199,13 @@ class Modules
 		// immediately returns that result instead of searching through both
 		if ( ! empty($segments)) {
 			$modules[array_shift($segments)] = ltrim(implode('/', $segments).'/','/');			
+		}
+		
+		// Is this file being overridden in an application directory? If so use that
+		if($base == 'views/' || $base == 'models/' || $base == 'plugins/') {
+			if(is_file(APPPATH.$base.$module.'/'.$path.$file_ext)) {
+				return array(APPPATH.$base.$module.'/'.$path, $file, FALSE);
+			}
 		}
 		
 		// If $module arg exists, then add as a place to search with $file as full path
@@ -263,7 +270,7 @@ class Modules
 	
 	/** Parse module routes **/
 	public static function parse_routes($module, $uri, $locations = array()) {
-	
+				
 		/* load the route file and merge routes if more than one location is read */
 		if ( ! isset(self::$routes[$module])) {
 			self::$routes[$module] = array();
@@ -283,14 +290,20 @@ class Modules
 				}
 			}
 		}
-		
+
 		if ( ! isset(self::$routes[$module])) return;
+		
+		// Does our URI actually have a trailing slash?
+		$URI =& load_class('URI', 'core');
+		if($URI->has_trailing_slash()) {
+			$uri .= '/';
+		}
 			
 		/* parse module routes */
-		foreach (self::$routes[$module] as $key => $val) {
+		foreach (self::$routes[$module] as $key => $val) {	
 			//log_message('debug', "-- Found route rule: $key -> " . (($val) ? $val : '[Removed this default route]'));
 					
-			$key = str_replace(array(':any', ':num'), array('.+', '[0-9]+'), $key);
+			$key = str_replace(array(':any', ':num'), array('.*[^\/]{1}', '[0-9]+'), $key);
 			
 			if (preg_match('#^'.$key.'$#', $uri)) {							
 				if (strpos($val, '$') !== FALSE AND strpos($key, '(') !== FALSE) {
@@ -300,7 +313,7 @@ class Modules
 				if(array_shift(explode("/", $val))) {
 					log_message('debug', "**** Found matching route '$uri' in module '$module', controller '" . array_shift(explode("/", $val)) . "', method '" . array_pop(explode("/", $val)) . "'");
 				}
-				return explode('/', $module.'/'.$val);
+				return array(explode('/', $module.'/'.$val));
 			}
 		}
 	}
