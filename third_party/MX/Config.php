@@ -32,14 +32,13 @@
  * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
- *
+ * 
  * This is a forked version of the original Modular Extensions - HMVC library to
  * support better module routing, and speed optimizations. These additional
  * changes were made by:
  * 
  * @author		Brian Wozeniak
- * @copyright	Copyright (c) 1998-2012, Unmelted, LLC
- *
+ * @copyright	Copyright (c) 1998-2013, Unmelted, LLC
  **/
 class MX_Config extends CI_Config 
 {	
@@ -55,7 +54,7 @@ class MX_Config extends CI_Config
 		if ($path === FALSE) {
 			parent::load($file, $use_sections, $fail_gracefully);					
 			return $this->item($file);
-		}  
+		}
 		
 		if (defined('ENVIRONMENT') AND file_exists($path.ENVIRONMENT.'/'.$file.'.php')) {
 			$path = $path.ENVIRONMENT.'/';
