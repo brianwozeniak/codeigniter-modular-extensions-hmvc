@@ -211,6 +211,15 @@ class MX_URI extends CI_URI {
 	{
 		return $this->has_trailing_slash;		
 	}
+	
+	/**
+	 * Returns the URI string exactly as it really is, with or without a trailing slash
+	 * 
+	 * @return string
+	 */
+	public function exact_uri_string() {
+		return $this->uri_string() . ($this->has_trailing_slash() ? '/' : '');
+	}
 }
 
 
