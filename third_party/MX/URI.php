@@ -202,6 +202,24 @@ class MX_URI extends CI_URI {
 	}
 	
 	/**
+	 * Parse cli arguments
+	 *
+	 * Take each command line argument and assume it is a URI segment.
+	 * 
+	 * Nothing changed here from the original CI _parse_cli_args. Unfortunately we have to add this because it is a
+	 * private method, and CLI requests will not function properly without it.
+	 *
+	 * @access	private
+	 * @return	string
+	 */
+	private function _parse_cli_args()
+	{
+		$args = array_slice($_SERVER['argv'], 1);
+	
+		return $args ? '/' . implode('/', $args) : '';
+	}
+	
+	/**
 	 * Returns whether or not the URI loaded with trailing slash
 	 *
 	 * @access	public
