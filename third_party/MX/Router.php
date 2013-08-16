@@ -230,6 +230,14 @@ class MX_Router extends CI_Router
 			return;
 		}
 		
+		// Let's make sure all segments are lower case. It is possible in routing files that uppercase letters are
+		// used. This ensures everything gets translated to lowercase. The main reason for doing this is that on
+		// Windows machines since files will match any case, it may work there, but on Linux machines it must match
+		// the exact case. This could cause differences between development machines and production machines which
+		// would allow a route to work fine on Windows, but not on Linux, and may be hard to trace the cause. By
+		// adding this you should always ensure all controllers are in lowercase.
+		$segments = array_map('strtolower', $segments);
+		
 		/* get the segments array elements */
 		list($module, $directory, $controller) = array_pad($segments, 3, NULL);
 
