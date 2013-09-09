@@ -195,21 +195,21 @@ class MX_Router extends CI_Router
 		$this->directory = '';
 		$this->location = '';
 		$ext = $this->config->item('controller_suffix').EXT;
-		$uri = implode("/", $segments);
+		$routed = implode("/", $segments);
 			
 		/* use module route if available and use exact module location if exists */
-		if (isset($segments[0]) && $this->module_map($segments[0]) AND list($routes) = Modules::parse_routes($segments[0], $uri, $this->module_map($segments[0]))) {
+		if (isset($segments[0]) && $this->module_map($segments[0]) AND list($routes) = Modules::parse_routes($segments[0], $routed, $this->module_map($segments[0]))) {
 			$segments = $routes;
 		}
 		// Otherwise go through all module routes and stop at the first match if any (lower precedence)
 		elseif(isset($segments[0])) {
-			//log_message('debug', "Scanning for first match in all modules' routing files with the URI segment: " . $uri);
+			//log_message('debug', "Scanning for first match in all modules' routing files with the URI segment: " . $routed);
 			
 			//Get all of the module names and locations
 			$directories = $this->module_map();
 				
 			foreach($directories as $module => $locations) {
-				if(list($routes) = Modules::parse_routes($module, $uri, array($module => $locations))) {
+				if(list($routes) = Modules::parse_routes($module, $routed, array($module => $locations))) {
 					$segments = $routes;
 
 					//Since a route is found, no need to keep looking, break out of loop
@@ -226,7 +226,7 @@ class MX_Router extends CI_Router
 		$module_source = (isset($trace[1]['class']) && $trace[1]['class'] == 'Modules' && isset($trace[1]['function']) && $trace[1]['function'] == 'load');
 		
 		// Should all modules be unaccessable unless a route explicitly matches?
-		if($this->remove_default_routes && !$module_source && empty($routes) && (!in_array($uri, array_values($this->routes))) ) {
+		if($this->remove_default_routes && !$module_source && empty($routes) && !$this->_validate_route($routed)) {
 			return;
 		}
 		
@@ -306,7 +306,47 @@ class MX_Router extends CI_Router
 		$this->class = $class.$this->config->item('controller_suffix');
 	}
 	
+	/**
+	 * Simply returns if our URI had a trailing slash or not
+	 * 
+	 * @return boolean TRUE if URI has trailing slash, FALSE if not
+	 */
 	protected function has_trailing_slash() {
 		return $this->uri->has_trailing_slash();
+	}
+	
+	/**
+	 * Takes a translated route, parses wildcards, and returns TRUE if anything matches as being valid
+	 * 
+	 * @param string $routed
+	 */
+	private function _validate_route($routed) {
+		
+		// Break down all the segments of our translated route
+		$routed_segments = explode('/', $routed);
+		
+		// Do we have a match with our default controller?
+		if ($this->default_controller == $routed || $this->default_controller == $routed_segments[0]) {
+			return TRUE;
+		}
+				
+		// Turn the URI segment array into a URI string
+		$uri = implode('/', $this->uri->segments);
+		
+		// Go through each route and see if it matches with wildcards
+		foreach ($this->routes as $key => $val) {
+			$key = str_replace(':any', '.+', str_replace(':num', '[0-9]+', $key));
+			
+			if (preg_match('#^' . $key . '$#', $uri))	{				
+				return TRUE;
+			}
+		}
+		
+		// Finally do we have a match with a 404 override?
+		if(isset($this->routes['404_override']) AND $this->routes['404_override'] == $routed) {
+			return TRUE;			
+		}
+		
+		return FALSE;
 	}
 }
