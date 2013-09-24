@@ -101,6 +101,9 @@ class MX_Router extends CI_Router
 			if(!empty($this->map)) {
 				return $this->module_map($module);
 			}
+			
+			// No modules? Return empty array
+			return array();
 		}
 	}
 	
